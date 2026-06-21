@@ -1,0 +1,15 @@
+---
+title: Autonomous Data Journalism Agent
+emoji: 👁
+colorFrom: green
+colorTo: indigo
+sdk: gradio
+sdk_version: 6.19.0
+python_version: '3.13'
+app_file: app.py
+pinned: false
+license: mpl-2.0
+short_description: Autonomous Data Journalism w. Entertainmen Industry Datasets
+---
+
+Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference

@@ -98,4 +98,4 @@ with gr.Blocks(title="Autonomous Data Journalism Agent") as demo:
 
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(ssr_mode=False)

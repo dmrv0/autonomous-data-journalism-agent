@@ -5,11 +5,6 @@ from src.sandbox import Sandbox
 
 KAGGLE_PREFIX = "kaggle:"
 
-
-# Runs INSIDE the E2B VM. `paths` is injected as a Python literal (see
-# ingest_node). Every CSV is profiled with the same sampled-schema strategy so
-# the analyst can see (and join across) all tables in a multi-file dataset
-# without any raw rows ever reaching the LLM.
 INGEST_CODE = """
 import pandas as pd
 import json
@@ -113,7 +108,6 @@ print(json.dumps({"files": files, "ingest_mode": "sampled_schema"}, default=str)
 def ingest_node(state: AgentState, sandbox: Sandbox) -> dict:
     dataset_path = state["dataset_path"]
     if dataset_path.startswith(KAGGLE_PREFIX):
-        # Big-dataset path: download inside the sandbox and profile every CSV.
         dataset_ref = dataset_path[len(KAGGLE_PREFIX):]
         csv_files = sandbox.download_kaggle(dataset_ref)
         paths = [f["path"] for f in csv_files]
@@ -130,14 +124,11 @@ def ingest_node(state: AgentState, sandbox: Sandbox) -> dict:
 
     primary = _primary_path(schema["files"])
     schema["primary_path"] = primary
-    # Point the sandbox's convenience handle at the largest table.
     sandbox.set_dataset_path(primary)
     return {"schema": schema, "analysis_plan": _initial_plan(schema)}
 
 
 def _primary_path(files: list[dict]) -> str:
-    """The 'main' table — largest by byte size. Used as the sandbox's default
-    handle; the analyst still receives every file and may join across them."""
     return max(files, key=lambda f: f.get("size_bytes", 0))["path"]
 
 

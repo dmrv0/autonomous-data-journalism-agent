@@ -40,9 +40,12 @@ DO flag:
   artifact rather than a real insight, EVEN IF the number matches the output.
   Examples: a median or mean rating at or near 0 for a major group (a sign
   unrated titles were not filtered out), a "trend" anchored on an impossible or
-  placeholder year (e.g. 1800 — before cinema existed), or an extreme figure
-  driven by a single junk row. Flag these as implausible and ask for the metric
-  to be recomputed on credible, filtered rows.
+  placeholder year (e.g. 1800 — before cinema existed), an average feature-film
+  runtime of only a few minutes (shorts/episodes not filtered out), a 100%/0%
+  or otherwise extreme per-group rate backed by only a handful of rows (e.g.
+  "100% of films from a country with 2 entries"), or an extreme figure driven by
+  a single junk row. Flag these as implausible and ask for the metric to be
+  recomputed on credible, filtered rows.
 
 Before flagging, re-read the exact column/metric names in the output and identify
 the specific output line you are contradicting. Keep each issue atomic, specific,
@@ -63,13 +66,6 @@ ANALYSIS OUTPUT (ground truth):
 
 
 def parse_llm_verdict(text: str) -> list[str]:
-    """Turn the verifier LLM's JSON reply into a list of issue strings.
-
-    Tolerant of code fences and surrounding prose: extracts the first {...}
-    block, parses it, and returns its "issues" when "supported" is false.
-    Returns [] on a clean verdict or if the reply can't be parsed (fail-open —
-    the regex tiers still gate, so a flaky verifier never blocks the pipeline).
-    """
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if not match:
         return []
@@ -84,11 +80,6 @@ def parse_llm_verdict(text: str) -> list[str]:
 
 
 def verify_semantic(article: str, stdouts: list[str], llm=None) -> list[str]:
-    """LLM tier: catch contradictions/unsupported claims regex cannot see.
-
-    `llm` is injectable so tests can pass a fake; in the graph it defaults to the
-    shared provider (Gemini primary, Qwen fallback) at temperature 0.
-    """
     if not article.strip() or not any(s.strip() for s in stdouts):
         return []
     llm = llm or get_llm(temperature=0.0)
@@ -201,21 +192,6 @@ def select_blocking_errors(
     rank_errors: list[str],
     semantic_errors: list[str],
 ) -> list[str]:
-    """Decide which findings force a revision loop.
-
-    Policy: block on the high-precision deterministic tiers (sign, rank) and the
-    LLM semantic tier — and order them so the analyst sees concrete, fixable
-    issues first.
-
-    Raw ``value_errors`` are deliberately NOT blocking. That regex flags every
-    digit-string in the article that isn't a verbatim stdout substring, which is
-    what produced the false-positive churn in practice ("12 / 21 / 30 not
-    found" cost three wasted loops on a correct article). Exact-figure
-    hallucinations are now caught by the semantic tier, which understands
-    rounding and context instead of doing blind substring matching. The
-    parameter is kept so the signature documents the full set of tiers and the
-    choice to drop it is explicit.
-    """
     blocking: list[str] = []
     for err in [*sign_errors, *rank_errors, *semantic_errors]:
         if err not in blocking:
@@ -227,11 +203,6 @@ def evaluator_node(state: AgentState, llm=None) -> dict:
     stdouts = [r["stdout"] for r in state["analysis_results"]]
     article = state["article_draft"]
     if not any(s.strip() for s in stdouts):
-        # Groundedness gate: with no analysis output, NOTHING in the article can
-        # be traced to a computed statistic. "Cannot verify" must fail, never
-        # pass — otherwise a fully hallucinated draft sails through. Route back
-        # to the analyst (which now sees the failing script's stderr) to produce
-        # real output before we accept any article.
         errors = [
             "The analysis produced no output (empty stdout), so no claim in the "
             "article can be grounded in a computed statistic. Re-run the analysis "

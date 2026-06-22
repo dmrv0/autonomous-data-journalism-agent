@@ -3,18 +3,10 @@ import json
 import os
 from e2b_code_interpreter import Sandbox as E2BSandbox
 
-# The sandbox must outlive a multi-iteration revision loop (download + several
-# analyst/journalist/evaluator passes), and a single analysis over 1M+ rows can
-# take a while — give both generous headroom so executions aren't cut off
-# ("UnexpectedEndOfExecution: Connection to the execution was closed").
 SANDBOX_TIMEOUT_SECONDS = 900
 RUN_TIMEOUT_SECONDS = 300
 
 
-# Runs INSIDE the E2B VM. `ref` is injected as a Python literal (see
-# download_kaggle) so we avoid str.format brace-escaping headaches. The big
-# dataset is downloaded over E2B's datacenter link and never touches the host;
-# only this small JSON manifest of discovered CSVs travels back.
 KAGGLE_DOWNLOAD_CODE = """
 import json, os, glob
 import kagglehub
@@ -31,20 +23,12 @@ print(json.dumps({"download_dir": download_dir, "csv_files": csv_files}))
 def _parse_kaggle_manifest(
     stdout: str, stderr: str, error, dataset_ref: str
 ) -> list[dict]:
-    """Turn a sandbox download execution into the CSV manifest.
-
-    `error` is E2B's structured execution error (an actual Python exception) or
-    None. stderr is NOT treated as failure: kagglehub/tqdm write progress bars
-    and warnings there on a perfectly successful download.
-    """
     if error is not None:
         detail = f"{error.name}: {error.value}"
         if stderr.strip():
             detail += f"\n{stderr.strip()}"
         raise RuntimeError(f"Kaggle download failed: {detail}")
 
-    # Scan from the end for the first line that parses as our manifest, so any
-    # stray progress text that leaked onto stdout cannot break ingestion.
     payload = None
     for line in reversed([ln for ln in stdout.splitlines() if ln.strip()]):
         try:
@@ -70,9 +54,6 @@ class Sandbox:
     def __init__(self) -> None:
         self._sbx = E2BSandbox.create(timeout=SANDBOX_TIMEOUT_SECONDS)
         self._dataset_remote_path: str | None = None
-        # A single code context whose kernel we reset before every run() (see
-        # _fresh_context). The dataset lives on the sandbox disk, so clearing
-        # kernel memory between runs loses nothing the next script needs.
         self._context = None
 
     def upload(self, local_path: str, remote_name: str = "data.csv") -> str:
@@ -103,16 +84,6 @@ class Sandbox:
         )
 
     def _fresh_context(self):
-        """Return a code context with an empty kernel.
-
-        The E2B kernel keeps variables/imports between run_code calls, so each
-        analyst pass would otherwise leave its full-dataset DataFrames in memory.
-        Across the evaluator's revision loop those reads accumulate and OOM-kill
-        the kernel ("Connection to the execution was closed"), after which the
-        whole sandbox becomes unreachable (502). Restarting the context before
-        each run keeps every execution at single-pass memory — which the first
-        successful run already proves fits.
-        """
         if self._context is None:
             self._context = self._sbx.create_code_context()
         else:

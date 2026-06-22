@@ -30,9 +30,6 @@ Draft the article.
 def journalist_node(state: AgentState) -> dict:
     results = state["analysis_results"]
     if not any(r["stdout"].strip() for r in results):
-        # Nothing was computed. Do NOT let the model invent a plausible article
-        # from priors — emit an explicit non-article so the evaluator's
-        # groundedness gate routes back to the analyst.
         return {
             "article_draft": "INSUFFICIENT DATA: the analysis produced no output, "
             "so there are no verified findings to report."

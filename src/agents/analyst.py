@@ -11,10 +11,11 @@ Rules:
 - Use only pandas, numpy, scipy.
 - MEMORY IS LIMITED. The datasets can have over a million rows. For each dataset, you MUST read it as: pd.read_csv(path, **read_csv_settings). Those settings already pin usecols and dtypes that keep the load within memory — do NOT read extra columns and do NOT override the dtypes. Reading the raw file with all columns will crash the sandbox.
 - DATA IS DIRTY. Public datasets are full of junk/placeholder rows (zeros, sentinel values, unrated or unreleased titles, impossible dates). Before ANY ranking, correlation, or group statistic you MUST filter to credible rows, and do the filtering BEFORE heavy groupby/explode so large files stay within memory:
-  * Keep released titles only, and a plausible value range for the metric (positive budget/revenue; a sensible year — cinema starts ~1888, so drop rows whose year is earlier than that or in the future).
+  * Keep released titles only, and a plausible value range for EVERY metric you average — not just money. Positive budget/revenue; a sensible year (cinema starts ~1888, drop earlier/future years); a feature-length runtime range (e.g. ~40–240 min) so shorts, trailers, and TV episodes don't drag a "film runtime" average down to a few minutes.
   * For any RATING metric (vote_average), additionally require a minimum number of votes (e.g. vote_count >= 50). The median/mean rating over unrated 0-vote rows collapses to ~0.0 and is meaningless — never report it.
+  * For any PER-GROUP statistic (a percentage, mean, or ranking by group such as country/language/genre), require a minimum group size (e.g. n >= 30), ignore groups below it, and print each group's n. A 100% or 0% rate, or an extreme average, computed from a handful of rows is noise, not a finding (e.g. "100% of films from a country with 2 entries").
   * Print how many rows survive the filter. Never rank, average, or correlate on the raw, unfiltered data.
-  A computed average/median rating at or near 0 for a major group, or a "trend" anchored on a single ancient/placeholder year, means the data was NOT cleaned — fix the filter, never report the artifact.
+  A rating at or near 0 for a major group, a "trend" on a placeholder year, a feature runtime averaging a few minutes, or a 100%/0% rate from a tiny group all mean the data was NOT cleaned — fix the filter, never report the artifact.
 - When grouping or ranking by a categorical key (country, language, genre, studio), drop rows whose key is missing/NaN/empty/'nan' BEFORE aggregating, so a "nan" bucket never appears as a ranked group.
 - If two datasets share an obvious key column, you may merge them to surface cross-table insights.
 - Wrap the body in try/except and print the full traceback on failure, so errors are never silent.
@@ -66,9 +67,6 @@ def _format_datasets(files: list[dict]) -> str:
 
 
 def _build_revision_notes(state: AgentState) -> str:
-    """Tell the analyst what went wrong last time. Crucially, this surfaces the
-    previous script's stderr — a failed run (empty stdout) is otherwise invisible
-    to the LLM and it would just regenerate the same broken script."""
     parts = []
     runs = state.get("analysis_results", [])
     last = runs[-1] if runs else None

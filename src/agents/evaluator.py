@@ -36,6 +36,13 @@ DO flag:
   the output lists only the song title and a number. (Do NOT flag generic
   descriptive nouns like "the film industry" or "global box office" — only
   specific factual attributions tied to a ranked/listed data point.)
+- COMMON-SENSE / PLAUSIBILITY: a finding that is clearly a data-cleaning
+  artifact rather than a real insight, EVEN IF the number matches the output.
+  Examples: a median or mean rating at or near 0 for a major group (a sign
+  unrated titles were not filtered out), a "trend" anchored on an impossible or
+  placeholder year (e.g. 1800 — before cinema existed), or an extreme figure
+  driven by a single junk row. Flag these as implausible and ask for the metric
+  to be recomputed on credible, filtered rows.
 
 Before flagging, re-read the exact column/metric names in the output and identify
 the specific output line you are contradicting. Keep each issue atomic, specific,

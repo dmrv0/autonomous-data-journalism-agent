@@ -6,6 +6,7 @@ from langgraph.graph import StateGraph, END
 from src.state import AgentState
 from src.sandbox import Sandbox
 from src.agents.ingest import ingest_node
+from src.agents.planner import planner_node
 from src.agents.analyst import analyst_node
 from src.agents.journalist import journalist_node
 from src.agents.evaluator import evaluator_node, evaluator_route
@@ -14,12 +15,14 @@ from src.agents.evaluator import evaluator_node, evaluator_route
 def build_graph(sandbox: Sandbox):
     workflow = StateGraph(AgentState)
     workflow.add_node("ingest", partial(ingest_node, sandbox=sandbox))
+    workflow.add_node("planner", planner_node)
     workflow.add_node("analyst", partial(analyst_node, sandbox=sandbox))
     workflow.add_node("journalist", journalist_node)
     workflow.add_node("evaluator", evaluator_node)
 
     workflow.set_entry_point("ingest")
-    workflow.add_edge("ingest", "analyst")
+    workflow.add_edge("ingest", "planner")
+    workflow.add_edge("planner", "analyst")
     workflow.add_edge("analyst", "journalist")
     workflow.add_edge("journalist", "evaluator")
     workflow.add_conditional_edges(

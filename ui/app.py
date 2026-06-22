@@ -53,6 +53,14 @@ def run_pipeline(csv_file, kaggle_ref):
             elapsed = time.monotonic() - started_at
             for node, update in event.items():
                 log += f"\n▶ {node} completed at +{elapsed:.1f}s\n"
+                if node == "planner":
+                    plan = update.get("analysis_plan")
+                    if plan:
+                        log += "  planned investigations (chosen from the schema):\n"
+                        for i, task in enumerate(plan, 1):
+                            log += f"    {i}. {task[:160]}\n"
+                    else:
+                        log += "  (kept the default investigation plan)\n"
                 if "analysis_results" in update and update["analysis_results"]:
                     last = update["analysis_results"][-1]
                     log += f"  stdout (truncated):\n  {last['stdout'][:500]}\n"

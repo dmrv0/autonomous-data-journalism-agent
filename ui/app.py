@@ -74,17 +74,16 @@ def run_pipeline(csv_file, kaggle_ref):
 with gr.Blocks(title="Autonomous Data Journalism Agent") as demo:
     gr.Markdown("# Autonomous Data Journalism Agent")
     gr.Markdown(
-        "Upload a CSV of entertainment industry data, **or** give a Kaggle dataset "
-        "ref (e.g. `asaniczka/tmdb-movies-dataset-2023-930k-movies`) to download it "
-        "straight into the sandbox. The agent performs EDA, drafts an article, and "
-        "verifies every numerical claim."
+        "Upload a CSV of entertainment industry data, "
+        "**or** give a Kaggle dataset ref to download it straight into the sandbox. "
+        "The agent performs EDA, drafts an article, and verifies every numerical claim."
     )
     with gr.Row():
         with gr.Column():
             file_input = gr.File(label="CSV dataset", file_types=[".csv"])
             kaggle_input = gr.Textbox(
-                label="…or Kaggle dataset ref (owner/slug)",
-                placeholder="asaniczka/tmdb-movies-dataset-2023-930k-movies",
+                label="…or Kaggle dataset ref (owner/dataset-name)",
+                placeholder="owner/dataset-name",
             )
             run_btn = gr.Button("Run pipeline", variant="primary")
             log_output = gr.Textbox(label="Live agent log", lines=20, max_lines=40)

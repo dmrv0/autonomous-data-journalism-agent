@@ -68,10 +68,12 @@ def _parse_kaggle_manifest(
 
 class Sandbox:
     def __init__(self) -> None:
-        # E2BSandbox() constructor is deprecated in e2b-code-interpreter >=1.0;
-        # use the Sandbox.create() classmethod instead.
         self._sbx = E2BSandbox.create(timeout=SANDBOX_TIMEOUT_SECONDS)
         self._dataset_remote_path: str | None = None
+        # A single code context whose kernel we reset before every run() (see
+        # _fresh_context). The dataset lives on the sandbox disk, so clearing
+        # kernel memory between runs loses nothing the next script needs.
+        self._context = None
 
     def upload(self, local_path: str, remote_name: str = "data.csv") -> str:
         with open(local_path, "rb") as f:
@@ -84,18 +86,11 @@ class Sandbox:
         return self._dataset_remote_path
 
     def download_kaggle(self, dataset_ref: str) -> list[dict]:
-        """Download a Kaggle dataset directly inside the sandbox.
-
-        Returns a manifest of every CSV found: [{"path", "size_bytes"}, ...].
-        The ingest node profiles all of them and points the sandbox's primary
-        handle at the largest (see ingest._primary_path).
-        """
         envs = {
             name: value
             for name in ("KAGGLE_USERNAME", "KAGGLE_KEY")
             if (value := os.environ.get(name))
         }
-        # kagglehub is not in the default E2B template; install it in the VM.
         self._sbx.commands.run("pip install -q kagglehub", timeout=300, envs=envs)
 
         code = "ref = " + repr(dataset_ref) + "\n" + KAGGLE_DOWNLOAD_CODE
@@ -107,8 +102,28 @@ class Sandbox:
             dataset_ref=dataset_ref,
         )
 
+    def _fresh_context(self):
+        """Return a code context with an empty kernel.
+
+        The E2B kernel keeps variables/imports between run_code calls, so each
+        analyst pass would otherwise leave its full-dataset DataFrames in memory.
+        Across the evaluator's revision loop those reads accumulate and OOM-kill
+        the kernel ("Connection to the execution was closed"), after which the
+        whole sandbox becomes unreachable (502). Restarting the context before
+        each run keeps every execution at single-pass memory — which the first
+        successful run already proves fits.
+        """
+        if self._context is None:
+            self._context = self._sbx.create_code_context()
+        else:
+            self._sbx.restart_code_context(self._context)
+        return self._context
+
     def run(self, code: str) -> dict:
-        exec_result = self._sbx.run_code(code, timeout=RUN_TIMEOUT_SECONDS)
+        context = self._fresh_context()
+        exec_result = self._sbx.run_code(
+            code, context=context, timeout=RUN_TIMEOUT_SECONDS
+        )
         stdout = "\n".join(exec_result.logs.stdout)
         stderr = "\n".join(exec_result.logs.stderr)
         if exec_result.error:

@@ -11,6 +11,7 @@ Rules:
 - Use only pandas, numpy, scipy.
 - MEMORY IS LIMITED. The datasets can have over a million rows. For each dataset, you MUST read it as: pd.read_csv(path, **read_csv_settings). Those settings already pin usecols and dtypes that keep the load within memory — do NOT read extra columns and do NOT override the dtypes. Reading the raw file with all columns will crash the sandbox.
 - DATA IS DIRTY. Public datasets contain junk/placeholder rows (zeros, sentinel values, unrated or unreleased entries). Before ranking or correlating, filter to credible records (e.g. positive/plausible values in the metric, a minimum vote/popularity count, released status) and print how many rows survive the filter. Never rank on the raw, unfiltered data.
+- When grouping or ranking by a categorical key (country, language, genre, studio), drop rows whose key is missing/NaN/empty/'nan' BEFORE aggregating, so a "nan" bucket never appears as a ranked group.
 - If two datasets share an obvious key column, you may merge them to surface cross-table insights.
 - Wrap the body in try/except and print the full traceback on failure, so errors are never silent.
 - ALL findings must be emitted via print(). Do NOT use display() or notebook magics.
